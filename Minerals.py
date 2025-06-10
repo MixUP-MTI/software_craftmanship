@@ -1,109 +1,105 @@
+from abc import ABC, abstractmethod
 import Blueprint
 
-blueprints= Blueprint.parse_blueprints('blueprints.txt')
-    
-class factory:
-    def __init__(self, blueprint):
-        self.blueprint = blueprint
-        self.robots = {
-            'ore': 1,
-            'clay': 0,
-            'obsidian': 0,
-            'geode': 0
-        }
-        self.resources = {
-            'ore': 0,
-            'clay': 0,
-            'obsidian': 0,
-            'geode': 0
-        }
-        self.time = 1
-        self.time_limit = 24
+class RobotBuilder(ABC):
+    @abstractmethod
+    def can_build(self, resources: dict) -> bool: pass
+
+    @abstractmethod
+    def build(self, resources: dict): pass
+
+    @abstractmethod
+    def robot_type(self) -> str: pass
+
+class RobotBuilder:
+    def __init__(self, robot_type: str, cost: Blueprint.RobotCost):
+        self._robot_type = robot_type
+        self._cost = cost
+
+    def can_build(self, resources: dict) -> bool:
+        return all(resources.get(res, 0) >= qty for res, qty in self._cost.resources.items())
+
+    def build(self, resources: dict):
+        for res, qty in self._cost.resources.items():
+            resources[res] -= qty
+
+    def robot_type(self) -> str:
+        return self._robot_type
+
+
+class BuildStrategy(ABC):
+    @abstractmethod
+    def choose_builders(self, builders: list, time: int, time_limit: int) -> list:
+        pass
+
+class DefaultBuildStrategy(BuildStrategy):
+    def choose_builders(self, builders, time, time_limit):
+        chosen = []
+        if time < time_limit / 2:
+            for builder in builders:
+                if builder.robot_type() == "geode" and builder.can_build:
+                    chosen.append(builder)
+            if time % 8 == 0:
+                chosen += [b for b in builders if b.robot_type() == "ore"]
+        else:
+            chosen += [b for b in builders if b.robot_type() == "geode"]
+        return chosen
+
+class Factory:
+    def __init__(self, builders: list[RobotBuilder], strategy: BuildStrategy, time_limit=24):
+        self.builders = builders
+        self.strategy = strategy
+        self.robots = {b.robot_type(): 0 for b in builders}
+        self.robots["ore"] = 1  # Start with one ore robot
+        self.resources = {b.robot_type(): 0 for b in builders}
         self.queue_robot_builders = []
+        self.time = 1
+        self.time_limit = time_limit
 
     def collect_resources(self):
-        for robot_type, count in self.robots.items():
-            if count > 0:
-                self.resources[robot_type] += count
-                print(f"Collected {count} {robot_type} resources. Total {robot_type}: {self.resources[robot_type]}")
+        for rtype, count in self.robots.items():
+            if count == 0:
+                continue
+            self.resources[rtype] += count
+            print(f"Collected {count} {rtype} resources. Total {rtype}: {self.resources[rtype]}")
 
-    def build_ore_robot(self):
-        if self.resources['ore'] >= self.blueprint.ore_robot_cost:
-            self.resources['ore'] -= self.blueprint.ore_robot_cost
-            print("Spent", self.blueprint.ore_robot_cost, "ore to build an ore robot.")
-            self.queue_robot_builders.append('ore')
-    
-    def build_clay_robot(self):
-        if self.resources['ore'] >= self.blueprint.clay_robot_cost:
-            self.resources['ore'] -= self.blueprint.clay_robot_cost
-            print("Spent", self.blueprint.clay_robot_cost, "ore to build a clay robot.")
-            self.queue_robot_builders.append('clay')
 
-    def build_obsidian_robot(self):
-        if (self.resources['ore'] >= self.blueprint.obsidian_robot_cost_ore and
-            self.resources['clay'] >= self.blueprint.obsidian_robot_cost_clay):
-            self.resources['ore'] -= self.blueprint.obsidian_robot_cost_ore
-            self.resources['clay'] -= self.blueprint.obsidian_robot_cost_clay
-            print("Spent", self.blueprint.obsidian_robot_cost_ore, "ore and", 
-                  self.blueprint.obsidian_robot_cost_clay, "clay to build an obsidian robot.")
-            self.queue_robot_builders.append('obsidian')
-
-    def build_geode_robot(self):
-        if (self.resources['ore'] >= self.blueprint.geode_robot_cost_ore and
-            self.resources['obsidian'] >= self.blueprint.geode_robot_cost_obsidian):
-            self.resources['ore'] -= self.blueprint.geode_robot_cost_ore
-            self.resources['obsidian'] -= self.blueprint.geode_robot_cost_obsidian
-            print("Spent", self.blueprint.geode_robot_cost_ore, "ore and", 
-                  self.blueprint.geode_robot_cost_obsidian, "obsidian to build a geode robot.")
-            self.queue_robot_builders.append('geode')
+    def build_robots(self):
+        for builder in self.strategy.choose_builders(self.builders, self.time, self.time_limit):
+            if builder.can_build(self.resources):
+                builder.build(self.resources)
+                self.queue_robot_builders.append(builder.robot_type())
+                print("Spent", self.resources, "to build an", builder.robot_type(), "robot.")
+            
 
     def dequeue_robot_builders(self):
-        if self.queue_robot_builders:
-            robot_type = self.queue_robot_builders.pop(0)
-            self.robots[robot_type] += 1
-            print(f"Built a {robot_type} robot. Total {robot_type} robots: {self.robots[robot_type]}")
+        while self.queue_robot_builders:
+            rtype = self.queue_robot_builders.pop(0)
+            self.robots[rtype] += 1
+            print(f"Built a {rtype} robot. Total {rtype} robots: {self.robots[rtype]}")
 
-    def builder_algorithm(self):
-        if self.time < self.time_limit/2:
-            self.build_geode_robot()
-            if self.time%(8) == 0:
-                self.build_ore_robot()
-
-            if self.time%(3) == 0:
-                self.build_clay_robot()
-
-            if self.time%(1) == 0:
-                self.build_obsidian_robot()
-        else:
-
-            self.build_geode_robot()
-            self.build_geode_robot()
-            self.build_geode_robot()
-
-            if self.time%(10) == 0:
-                self.build_ore_robot()
-
-            if self.time%(10) == 0:
-                self.build_clay_robot()
-
-            if self.time%(4) == 0:
-                self.build_obsidian_robot()
 
     def turn(self):
         while self.time <= self.time_limit:
             print(f"== Minutes: {self.time} ==")
             self.collect_resources()
-
-            self.builder_algorithm()
-
+            self.build_robots()
             self.dequeue_robot_builders()
             self.time += 1
             print()
-        print("Final geodes:", self.resources['geode'])
-    
+        last_item = list(self.resources.items())[-1]
+        print(f"Final {last_item[0]}: {last_item[1]}")
 
-# blueprint_instance = Blueprint.Blueprint(4, 2, [3, 14], [2, 7])
-blueprint_instance = Blueprint.Blueprint(2, 3, [3, 8], [3, 12])
-# factory_instance = factory(blueprints[0])
-factory_instance = factory(blueprint_instance)
-factory_instance.turn()
+
+loader = Blueprint.BlueprintLoader(Blueprint.DefaultBlueprintParser())
+blueprints = loader.load("blueprints copy.txt")
+for bp in blueprints:
+    builders = []
+    for robot, cost in bp.robot_costs.items():
+        robots = RobotBuilder(robot, cost)
+        builders.append(robots)
+
+        print(robot.capitalize(), cost.resources)
+    strategy = DefaultBuildStrategy()
+    factory = Factory(builders, strategy)
+    factory.turn()
