@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 import Blueprint
 
 class RobotBuilder(ABC):
@@ -11,21 +12,63 @@ class RobotBuilder(ABC):
     @abstractmethod
     def robot_type(self) -> str: pass
 
-class RobotBuilder:
-    def __init__(self, robot_type: str, cost: Blueprint.RobotCost):
-        self._robot_type = robot_type
-        self._cost = cost
+class OreRobotBuilder(RobotBuilder):
+    def __init__(self, cost: int):
+        self.cost = cost
 
-    def can_build(self, resources: dict) -> bool:
-        return all(resources.get(res, 0) >= qty for res, qty in self._cost.resources.items())
+    def can_build(self, resources):
+        return resources["ore"] >= self.cost
 
-    def build(self, resources: dict):
-        for res, qty in self._cost.resources.items():
-            resources[res] -= qty
+    def build(self, resources):
+        resources["ore"] -= self.cost
 
-    def robot_type(self) -> str:
-        return self._robot_type
+    def robot_type(self):
+        return "ore"
+    
+class ClayRobotBuilder(RobotBuilder):
+    def __init__(self, cost: int):
+        self.cost = cost
 
+    def can_build(self, resources):
+        return resources["ore"] >= self.cost
+
+    def build(self, resources):
+        resources["ore"] -= self.cost
+
+    def robot_type(self):
+        return "clay"
+    
+class ObsidianRobotBuilder(RobotBuilder):
+    def __init__(self, cost: dict):
+        self.cost = cost
+
+    def can_build(self, resources):
+        return (resources["ore"] >= self.cost["ore"] and
+                resources["clay"] >= self.cost["clay"])
+
+    def build(self, resources):
+        resources["ore"] -= self.cost["ore"]
+        resources["clay"] -= self.cost["clay"]
+
+    def robot_type(self):
+        return "obsidian"
+    
+class GeodeRobotBuilder(RobotBuilder):
+    def __init__(self, cost: dict):
+        self.cost = cost
+
+    def can_build(self, resources):
+        return (resources["ore"] >= self.cost["ore"] and
+                resources["obsidian"] >= self.cost["obsidian"])
+
+    def build(self, resources):
+        resources["ore"] -= self.cost["ore"]
+        resources["obsidian"] -= self.cost["obsidian"]
+
+    def robot_type(self):
+        return "geode"
+    
+### end builders
 
 class BuildStrategy(ABC):
     @abstractmethod
@@ -46,7 +89,7 @@ class DefaultBuildStrategy(BuildStrategy):
         return chosen
 
 class Factory:
-    def __init__(self, builders: list[RobotBuilder], strategy: BuildStrategy, time_limit=24):
+    def __init__(self, builders: list[RobotBuilder], strategy: BuildStrategy, time_limit=5):
         self.builders = builders
         self.strategy = strategy
         self.robots = {b.robot_type(): 0 for b in builders}
@@ -94,12 +137,12 @@ class Factory:
 loader = Blueprint.BlueprintLoader(Blueprint.DefaultBlueprintParser())
 blueprints = loader.load("blueprints copy.txt")
 for bp in blueprints:
-    builders = []
-    for robot, cost in bp.robot_costs.items():
-        robots = RobotBuilder(robot, cost)
-        builders.append(robots)
-
-        print(robot.capitalize(), cost.resources)
+    builders = [
+        OreRobotBuilder(bp.robot_costs['ore'].resources['ore']),
+        ClayRobotBuilder(bp.robot_costs['clay'].resources['ore']),
+        ObsidianRobotBuilder(bp.robot_costs['obsidian'].resources),
+        GeodeRobotBuilder(bp.robot_costs['geode'].resources),
+    ]
     strategy = DefaultBuildStrategy()
     factory = Factory(builders, strategy)
     factory.turn()
