@@ -106,4 +106,6 @@ def solve_blueprints(filename: str, time_limit: int = 24) -> int:
         print(f"Blueprint {i}: {max_diamonds} diamonds, qualité = {quality}")
     return total_quality
 
-solve_blueprints("diamond.txt")
+if __name__ == "__main__":
+    solve_blueprints("diamond.txt")
+
