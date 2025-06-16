@@ -22,7 +22,8 @@ class DefaultBlueprintParser(BlueprintParser):
         r"ore robot costs (\d+) ore.*?"
         r"clay robot costs (\d+) ore.*?"
         r"obsidian robot costs (\d+) ore and (\d+) clay.*?"
-        r"geode robot costs (\d+) ore and (\d+) obsidian"
+        r"geode robot costs (\d+) ore and (\d+) obsidian.*?"
+        r"diamond robot costs (\d+) geode, (\d+) clay and (\d+) obsidian"
     )
 
     def parse(self, text: str) -> Blueprint:
@@ -40,10 +41,16 @@ class DefaultBlueprintParser(BlueprintParser):
             "geode": RobotCost({
                 "ore": int(match.group(5)),
                 "obsidian": int(match.group(6))
-            })
+            }),
+            "diamond": RobotCost({
+                "geode": int(match.group(7)),
+                "clay": int(match.group(8)),
+                "obsidian": int(match.group(9)),
+            }),
         }
 
         return Blueprint(robot_costs)
+
 
 class BlueprintLoader:
     def __init__(self, parser: BlueprintParser):
