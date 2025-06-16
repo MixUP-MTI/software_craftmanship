@@ -72,7 +72,7 @@ class GeodeRobotBuilder(RobotBuilder):
 
 class BuildStrategy(ABC):
     @abstractmethod
-    def choose_builders(self, builders: list, time: int, time_limit: int) -> list:
+    def choose_builders(self, builders: list, time: int, time_limit: int, resources: dict) -> list:
         pass
 
 class DefaultBuildStrategy(BuildStrategy):
@@ -87,9 +87,42 @@ class DefaultBuildStrategy(BuildStrategy):
         else:
             chosen += [b for b in builders if b.robot_type() == "geode"]
         return chosen
+    
+class SmartBuildStrategy(BuildStrategy):
+    def __init__(self, blueprint):
+        self.costs = blueprint
+        self.max_needed = {
+            'ore': max(r.resources.get('ore', 0) for r in blueprint.values()),
+            'clay': blueprint['obsidian'].resources.get('clay', 0),
+            'obsidian': blueprint['geode'].resources.get('obsidian', 0),
+        }
+
+
+    def choose_builders(self, builders, time, time_limit, resources, robots) -> list:
+        def need_more(rtype, current_bots):
+            if rtype == 'geode':
+                return True
+
+            max_needed = self.max_needed.get(rtype, float('inf'))
+
+            remaining_time = time_limit - time
+            max_useful = max_needed * remaining_time
+
+            if resources.get(rtype, 0) + current_bots * remaining_time >= max_useful:
+                return False
+
+            # sinon on a besoin d'en construire plus
+            return current_bots < max_needed
+
+        for priority_type in ['geode', 'obsidian', 'clay', 'ore']:
+            for builder in builders:
+                if builder.robot_type() == priority_type and builder.can_build(resources):
+                    if need_more(priority_type, robots.get(priority_type, 0)):
+                        return [builder]
+        return []
 
 class Factory:
-    def __init__(self, builders: list[RobotBuilder], strategy: BuildStrategy, time_limit=5):
+    def __init__(self, builders: list[RobotBuilder], strategy: BuildStrategy, time_limit=24):
         self.builders = builders
         self.strategy = strategy
         self.robots = {b.robot_type(): 0 for b in builders}
@@ -108,7 +141,7 @@ class Factory:
 
 
     def build_robots(self):
-        for builder in self.strategy.choose_builders(self.builders, self.time, self.time_limit):
+        for builder in self.strategy.choose_builders(self.builders, self.time, self.time_limit, self.resources, self.robots):
             if builder.can_build(self.resources):
                 builder.build(self.resources)
                 self.queue_robot_builders.append(builder.robot_type())
@@ -135,7 +168,7 @@ class Factory:
 
 
 loader = Blueprint.BlueprintLoader(Blueprint.DefaultBlueprintParser())
-blueprints = loader.load("blueprints copy.txt")
+blueprints = loader.load("test.txt")
 for bp in blueprints:
     builders = [
         OreRobotBuilder(bp.robot_costs['ore'].resources['ore']),
@@ -143,6 +176,7 @@ for bp in blueprints:
         ObsidianRobotBuilder(bp.robot_costs['obsidian'].resources),
         GeodeRobotBuilder(bp.robot_costs['geode'].resources),
     ]
-    strategy = DefaultBuildStrategy()
+    print(bp.robot_costs)
+    strategy = SmartBuildStrategy(bp.robot_costs)
     factory = Factory(builders, strategy)
     factory.turn()
