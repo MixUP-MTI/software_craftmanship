@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from diamond_solver import OptimizedRobotFactory
+from Minerals import OptimizedRobotFactory
 from Blueprint import BlueprintLoader, DefaultBlueprintParser
 
 app = FastAPI()
@@ -16,8 +16,8 @@ def analyze_blueprints():
     best_id = 0
 
     for i, blueprint in enumerate(blueprints, 1):
-        factory = OptimizedRobotFactory(blueprint)
-        max_diamonds = factory.max_diamonds(time_limit=24)
+        factory = OptimizedRobotFactory(blueprint, final_resource="diamond")
+        max_diamonds = factory.max_final_resource(time_limit=24)
         quality = max_diamonds * i
 
         blueprint_results.append({
