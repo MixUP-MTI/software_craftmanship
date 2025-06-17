@@ -1,8 +1,8 @@
 from http.client import HTTPException
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from src.main import ProductCalculator, SolverConfig, solve_blueprints
 from src.blueprint import BlueprintLoader, DefaultBlueprintParser
+from src.solver import ProductCalculator, SolverConfig, solve_blueprints
 
 app = FastAPI()
 
