@@ -16,16 +16,15 @@ class OptimizedRobotFactory:
         self.final_resource = final_resource or self.resource_types[-1]
         self.final_index = self.resource_types.index(self.final_resource)
         self.max_spend = self._calculate_max_spend()
+        self.State = namedtuple("State", "time resources robots")
 
     def _calculate_max_spend(self):
         max_spend = {rtype: 0 for rtype in self.resource_types}
         max_spend[self.final_resource] = float('inf')
-
         for cost in self.blueprint.robot_costs.values():
             for r, v in cost.resources.items():
                 if r != self.final_resource:
                     max_spend[r] = max(max_spend[r], v)
-
         return max_spend
 
     def _can_build_robot(self, robot_type: str, resources: tuple) -> bool:
@@ -38,10 +37,25 @@ class OptimizedRobotFactory:
             new_resources[self.resource_types.index(r)] -= v
         return tuple(new_resources)
 
-    def max_final_resource(self, time_limit: int = 24) -> int:
-        State = namedtuple("State", "time resources robots")
-        start = State(0, tuple([0] * len(self.resource_types)), tuple([1 if i == 0 else 0 for i in range(len(self.resource_types))]))
+    def _initial_state(self) -> tuple:
+        return self.State(
+            0,
+            tuple([0] * len(self.resource_types)),
+            tuple([1 if i == 0 else 0 for i in range(len(self.resource_types))])
+        )
 
+    def _get_build_options(self, resources, robots) -> list:
+        options = []
+        for i, rtype in enumerate(self.resource_types):
+            if rtype != self.final_resource and robots[i] >= self.max_spend[rtype]:
+                continue
+            if self._can_build_robot(rtype, resources):
+                options.append(rtype)
+        options.append(None)
+        return options
+
+    def max_final_resource(self, time_limit: int = 24) -> int:
+        start = self._initial_state()
         seen = set()
         best_result = 0
         stack = deque([start])
@@ -53,7 +67,6 @@ class OptimizedRobotFactory:
                 best_result = max(best_result, resources[self.final_index])
                 continue
 
-            # Pruning
             minutes_left = time_limit - time
             current = resources[self.final_index]
             current_robots = robots[self.final_index]
@@ -66,16 +79,7 @@ class OptimizedRobotFactory:
                 continue
             seen.add(key)
 
-            build_options = []
-            for i, rtype in enumerate(self.resource_types):
-                if rtype != self.final_resource and robots[i] >= self.max_spend[rtype]:
-                    continue
-                if self._can_build_robot(rtype, resources):
-                    build_options.append(rtype)
-
-            build_options.append(None)  # option de ne rien construire
-
-            for choice in build_options:
+            for choice in self._get_build_options(resources, robots):
                 new_resources = list(resources)
                 for i in range(len(self.resource_types)):
                     new_resources[i] += robots[i]
@@ -85,7 +89,7 @@ class OptimizedRobotFactory:
                     new_resources = list(self._build_robot(choice, tuple(new_resources)))
                     new_robots[self.resource_types.index(choice)] += 1
 
-                stack.append(State(time + 1, tuple(new_resources), tuple(new_robots)))
+                stack.append(self.State(time + 1, tuple(new_resources), tuple(new_robots)))
 
         return best_result
 
