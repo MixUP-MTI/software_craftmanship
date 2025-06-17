@@ -81,3 +81,5 @@ class TestSolveBlueprints(unittest.TestCase):
             self.assertIsInstance(result, int)
             self.assertGreaterEqual(result, 0)
 
+if __name__ == '__main__':
+    unittest.main()

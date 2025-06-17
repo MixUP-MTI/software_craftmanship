@@ -1,3 +1,4 @@
+from http.client import HTTPException
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from Minerals import OptimizedRobotFactory
@@ -8,8 +9,14 @@ app = FastAPI()
 @app.get("/blueprints/analyze")
 def analyze_blueprints():
     filename = "diamond.txt"
-    loader = BlueprintLoader(DefaultBlueprintParser())
-    blueprints = loader.load(filename)
+    try:
+        loader = BlueprintLoader(DefaultBlueprintParser())
+        blueprints = loader.load(filename)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur lors du chargement des blueprints : {str(e)}")
+
+    if not blueprints:
+        raise HTTPException(status_code=404, detail="Aucun blueprint trouvé dans le fichier.")
 
     blueprint_results = []
     best_quality = 0
