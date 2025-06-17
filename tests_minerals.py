@@ -1,6 +1,6 @@
 import unittest
 from Minerals import (
-    OptimizedRobotFactory, QualityCalculator, ProductCalculator, solve_blueprints,
+    OptimizedRobotFactory, QualityCalculator, ProductCalculator, SolverConfig, solve_blueprints,
      Blueprint, DefaultBlueprintParser
 )
 from Blueprint import RobotCost
@@ -77,7 +77,14 @@ class TestSolveBlueprints(unittest.TestCase):
         )
 
         with patch("builtins.open", mock_open(read_data=blueprint_text)):
-            result = solve_blueprints("fakefile.txt", time_limit=24, calculator=QualityCalculator(), max_blueprints=1, output_file="test_output.txt")
+            config = SolverConfig(
+                filename="fakefile.txt",
+                time_limit=24,
+                calculator=QualityCalculator(),
+                max_blueprints=1,
+                output_file="test_output.txt"
+            )
+            result = solve_blueprints(config)
             self.assertIsInstance(result, int)
             self.assertGreaterEqual(result, 0)
 

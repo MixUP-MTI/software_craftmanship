@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Optional
 from abc import ABC, abstractmethod
 import re
 from collections import deque, namedtuple
@@ -112,8 +112,18 @@ class ProductCalculator(ResultCalculator):
         for geode_count in geodes:
             result *= geode_count
         return result
+    
+@dataclass
+class SolverConfig:
+    """Configuration pour le solveur de blueprints"""
+    filename: str
+    time_limit: int = 24
+    calculator: Optional[ResultCalculator] = None
+    max_blueprints: Optional[int] = None
+    output_file: str = "./analysis.txt"
+    final_resource: str = "geode"
 
-def solve_blueprints(filename: str, time_limit: int = 24, calculator: ResultCalculator = None, max_blueprints: int = None, output_file: str = "./analysis.txt", final_resource: str = "geode") -> int:
+def solve_blueprints(config: SolverConfig) -> int:
     """
     Résout les blueprints selon la stratégie de calcul fournie
     
@@ -128,15 +138,15 @@ def solve_blueprints(filename: str, time_limit: int = 24, calculator: ResultCalc
         Résultat calculé selon la stratégie choisie
     """
     # Dependency Inversion: dépend de l'abstraction ResultCalculator
-    if calculator is None:
-        calculator = QualityCalculator()
+    if config.calculator is None:
+        config.calculator = QualityCalculator()
     
     loader = BlueprintLoader(DefaultBlueprintParser())
-    blueprints = loader.load(filename)
+    blueprints = loader.load(config.filename)
     
     # Open/Closed: facile d'ajouter de nouvelles limites sans modifier le code
-    if max_blueprints is not None:
-        blueprints = blueprints[:max_blueprints]
+    if config.max_blueprints is not None:
+        blueprints = blueprints[:config.max_blueprints]
 
     final_resource_results = []
     blueprint_ids = []
@@ -145,8 +155,8 @@ def solve_blueprints(filename: str, time_limit: int = 24, calculator: ResultCalc
     for i, blueprint in enumerate(blueprints, 1):
         print(f"Traitement du Blueprint {i}...")
         
-        factory = OptimizedRobotFactory(blueprint, final_resource=final_resource)
-        max_geodes = factory.max_final_resource(time_limit)
+        factory = OptimizedRobotFactory(blueprint, final_resource=config.final_resource)
+        max_geodes = factory.max_final_resource(config.time_limit)
         
         final_resource_results.append(max_geodes)
         blueprint_ids.append(i)
@@ -155,13 +165,13 @@ def solve_blueprints(filename: str, time_limit: int = 24, calculator: ResultCalc
         quality = max_geodes * i
         blueprint_qualities.append(quality)
         
-        print(f"Blueprint {i}: {max_geodes} {final_resource}s")
+        print(f"Blueprint {i}: {max_geodes} {config.final_resource}s")
     
     # Écriture du fichier d'analyse
-    _write_analysis_file(output_file, blueprint_ids, blueprint_qualities)
+    _write_analysis_file(config.output_file, blueprint_ids, blueprint_qualities)
     
     # Liskov Substitution: n'importe quelle implémentation de ResultCalculator fonctionne
-    result = calculator.calculate(final_resource_results, blueprint_ids)
+    result = config.calculator.calculate(final_resource_results, blueprint_ids)
     return result
 
 
@@ -177,17 +187,35 @@ def _write_analysis_file(output_file: str, blueprint_ids: List[int], qualities: 
             best_index = qualities.index(max(qualities))
             best_blueprint_id = blueprint_ids[best_index]
             f.write(f"\nBest blueprint is the blueprint {best_blueprint_id}.\n")
-# === Main ===
 
+
+# === Main ===
 if __name__ == "__main__":
     filename = "blueprints.txt"
     filenameDiamond = "diamond.txt"
-
+    
     print("=== Partie 1 : Max Géodes en 24 min ===")
-    print(f"Score total: {solve_blueprints(filename, 24, QualityCalculator(),)}")
-
+    config1 = SolverConfig(
+        filename=filename,
+        time_limit=24,
+        calculator=QualityCalculator()
+    )
+    print(f"Score total: {solve_blueprints(config1)}")
+    
     print("\n=== Partie 2 : Produit des Géodes sur les 3 premiers en 32 min ===")
-    print(f"Produit total: {solve_blueprints(filename, 32, ProductCalculator(), 3)}")
-
+    config2 = SolverConfig(
+        filename=filename,
+        time_limit=32,
+        calculator=ProductCalculator(),
+        max_blueprints=3
+    )
+    print(f"Produit total: {solve_blueprints(config2)}")
+    
     print("\n=== Partie 3 : Produit des Diamants sur les 2 blueprints en 24 min ===")
-    print(f"Produit total: {solve_blueprints(filenameDiamond, 24, ProductCalculator(), max_blueprints=3, final_resource='diamond')}")
+    config3 = SolverConfig(
+        filename=filenameDiamond,
+        time_limit=24,
+        calculator=ProductCalculator(),
+        final_resource='diamond'
+    )
+    print(f"Produit total: {solve_blueprints(config3)}")
