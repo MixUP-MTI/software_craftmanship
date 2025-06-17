@@ -1,48 +1,39 @@
-from http.client import HTTPException
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from Minerals import ProductCalculator, SolverConfig, solve_blueprints
-from Blueprint import BlueprintLoader, DefaultBlueprintParser
+import os
+from src.solver import  ProductCalculator, QualityCalculator, SolverConfig, calculate_and_write_analysis
 
-app = FastAPI()
+    
 
-@app.get("/blueprints/analyze")
-def analyze_blueprints():
-    filename = "diamond.txt"
-    try:
-        loader = BlueprintLoader(DefaultBlueprintParser())
-        blueprints = loader.load(filename)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors du chargement des blueprints : {str(e)}")
-
-    if not blueprints:
-        raise HTTPException(status_code=404, detail="Aucun blueprint trouvé dans le fichier.")
-
-    config = SolverConfig(
+# === Main ===
+if __name__ == "__main__":
+    filename = os.path.join("data", "blueprints.txt")
+    filenameDiamond = os.path.join("data", "diamond.txt")
+    fileOutput = os.path.join("data", "analysis.txt")
+    
+    print("=== Partie 1 : Max Géodes en 24 min ===")
+    config1 = SolverConfig(
         filename=filename,
         time_limit=24,
-        calculator=ProductCalculator(),
-        final_resource='diamond'
+        calculator=QualityCalculator(),
+        output_file=fileOutput,
     )
+    print(f"Produit total: {calculate_and_write_analysis(config1)}")
     
-    (final_resource_results, blueprint_ids) = solve_blueprints(config)
-    blueprint_results = []
-    best_quality = 0
-    best_id = 0
-
-    for ressource, id in zip(final_resource_results, blueprint_ids):
-        quality = ressource * id
-
-        blueprint_results.append({
-            "id": str(id),
-            "quality": quality
-        })
-
-        if quality > best_quality:
-            best_quality = quality
-            best_id = id
-
-    return JSONResponse({
-        "bestBlueprint": str(best_id),
-        "blueprints": blueprint_results
-    })
+    print("\n=== Partie 2 : Produit des Géodes sur les 3 premiers en 32 min ===")
+    config2 = SolverConfig(
+        filename=filename,
+        time_limit=32,
+        calculator=ProductCalculator(),
+        max_blueprints=3,
+        output_file=fileOutput,
+    )
+    print(f"Produit total: {calculate_and_write_analysis(config2)}")
+    
+    print("\n=== Partie 3 : Produit des Diamants sur les 2 blueprints en 24 min ===")
+    config3 = SolverConfig(
+        filename=filenameDiamond,
+        time_limit=24,
+        calculator=ProductCalculator(),
+        final_resource='diamond',
+        output_file=fileOutput,
+    )
+    print(f"Produit total: {calculate_and_write_analysis(config3)}")

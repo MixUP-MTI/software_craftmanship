@@ -1,9 +1,6 @@
 import unittest
-from Minerals import (
-    OptimizedRobotFactory, QualityCalculator, ProductCalculator, SolverConfig, solve_blueprints,
-     Blueprint, DefaultBlueprintParser
-)
-from Blueprint import RobotCost
+
+from src.blueprint import Blueprint
 
 class TestOptimizedRobotFactory(unittest.TestCase):
     def setUp(self):

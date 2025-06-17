@@ -6,7 +6,7 @@ import re
 
 @dataclass
 class RobotCost:
-    # str: Ressource type, int: Quantity
+    # str: Resource type, int: Quantity
     resources: Dict[str, int]
 
 @dataclass
