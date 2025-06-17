@@ -1,7 +1,7 @@
 from http.client import HTTPException
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
-from Minerals import OptimizedRobotFactory
+from Minerals import ProductCalculator, SolverConfig, solve_blueprints
 from Blueprint import BlueprintLoader, DefaultBlueprintParser
 
 app = FastAPI()
@@ -18,23 +18,29 @@ def analyze_blueprints():
     if not blueprints:
         raise HTTPException(status_code=404, detail="Aucun blueprint trouvé dans le fichier.")
 
+    config = SolverConfig(
+        filename=filename,
+        time_limit=24,
+        calculator=ProductCalculator(),
+        final_resource='diamond'
+    )
+    
+    (final_resource_results, blueprint_ids) = solve_blueprints(config)
     blueprint_results = []
     best_quality = 0
     best_id = 0
 
-    for i, blueprint in enumerate(blueprints, 1):
-        factory = OptimizedRobotFactory(blueprint, final_resource="diamond")
-        max_diamonds = factory.max_final_resource(time_limit=24)
-        quality = max_diamonds * i
+    for ressource, id in zip(final_resource_results, blueprint_ids):
+        quality = ressource * id
 
         blueprint_results.append({
-            "id": str(i),
+            "id": str(id),
             "quality": quality
         })
 
         if quality > best_quality:
             best_quality = quality
-            best_id = i
+            best_id = id
 
     return JSONResponse({
         "bestBlueprint": str(best_id),

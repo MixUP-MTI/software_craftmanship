@@ -6,10 +6,12 @@ import re
 
 @dataclass
 class RobotCost:
+    # str: Ressource type, int: Quantity
     resources: Dict[str, int]
 
 @dataclass
 class Blueprint:
+    # str: Robot type
     robot_costs: Dict[str, RobotCost]
 
 class BlueprintParser(ABC):
@@ -21,7 +23,6 @@ class DefaultBlueprintParser(BlueprintParser):
     def parse(self, text: str) -> Blueprint:
         robot_costs = {}
 
-        # Expressions régulières pour chaque type de robot
         patterns = {
             "ore": r"ore robot costs (\d+) ore",
             "clay": r"clay robot costs (\d+) ore",
@@ -33,26 +34,27 @@ class DefaultBlueprintParser(BlueprintParser):
         for robot, pattern in patterns.items():
             match = re.search(pattern, text)
             if match:
-                if robot == "ore":
-                    robot_costs["ore"] = RobotCost({"ore": int(match.group(1))})
-                elif robot == "clay":
-                    robot_costs["clay"] = RobotCost({"ore": int(match.group(1))})
-                elif robot == "obsidian":
-                    robot_costs["obsidian"] = RobotCost({
-                        "ore": int(match.group(1)),
-                        "clay": int(match.group(2))
-                    })
-                elif robot == "geode":
-                    robot_costs["geode"] = RobotCost({
-                        "ore": int(match.group(1)),
-                        "obsidian": int(match.group(2))
-                    })
-                elif robot == "diamond":
-                    robot_costs["diamond"] = RobotCost({
-                        "geode": int(match.group(1)),
-                        "clay": int(match.group(2)),
-                        "obsidian": int(match.group(3))
-                    })
+                match robot:
+                    case "ore":
+                        robot_costs["ore"] = RobotCost({"ore": int(match.group(1))})
+                    case "clay":
+                        robot_costs["clay"] = RobotCost({"ore": int(match.group(1))})
+                    case "obsidian":
+                        robot_costs["obsidian"] = RobotCost({
+                            "ore": int(match.group(1)),
+                            "clay": int(match.group(2))
+                        })
+                    case "geode":
+                        robot_costs["geode"] = RobotCost({
+                            "ore": int(match.group(1)),
+                            "obsidian": int(match.group(2))
+                        })
+                    case "diamond":
+                        robot_costs["diamond"] = RobotCost({
+                            "geode": int(match.group(1)),
+                            "clay": int(match.group(2)),
+                            "obsidian": int(match.group(3))
+                        })
 
         if not robot_costs:
             raise ValueError(f"Invalid blueprint format: {text}")
@@ -69,7 +71,7 @@ class BlueprintLoader:
 
 if __name__ == "__main__":
     loader = BlueprintLoader(DefaultBlueprintParser())
-    blueprints = loader.load("blueprints copy.txt")
+    blueprints = loader.load("blueprints.txt")
 
     for bp in blueprints:
         for robot, cost in bp.robot_costs.items():

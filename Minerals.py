@@ -1,14 +1,12 @@
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import List, Optional
 from abc import ABC, abstractmethod
-import re
 from collections import deque, namedtuple
 from Blueprint import Blueprint, BlueprintLoader, DefaultBlueprintParser
 from typing import List
 
 
 # === Optimiseur DFS dynamique ===
-
 class OptimizedRobotFactory:
     def __init__(self, blueprint: Blueprint, final_resource: str = None):
         self.blueprint = blueprint
@@ -21,20 +19,20 @@ class OptimizedRobotFactory:
     def _calculate_max_spend(self):
         max_spend = {rtype: 0 for rtype in self.resource_types}
         max_spend[self.final_resource] = float('inf')
-        for cost in self.blueprint.robot_costs.values():
-            for r, v in cost.resources.items():
-                if r != self.final_resource:
-                    max_spend[r] = max(max_spend[r], v)
+        for robot_cost in self.blueprint.robot_costs.values():
+            for rtype, amount in robot_cost.resources.items():
+                if rtype != self.final_resource:
+                    max_spend[rtype] = max(max_spend[rtype], amount)
         return max_spend
 
     def _can_build_robot(self, robot_type: str, resources: tuple) -> bool:
         cost = self.blueprint.robot_costs[robot_type].resources
-        return all(resources[self.resource_types.index(r)] >= v for r, v in cost.items())
+        return all(resources[self.resource_types.index(rtype)] >= amount for rtype, amount in cost.items())
 
     def _build_robot(self, robot_type: str, resources: tuple) -> tuple:
         new_resources = list(resources)
-        for r, v in self.blueprint.robot_costs[robot_type].resources.items():
-            new_resources[self.resource_types.index(r)] -= v
+        for rtype, amount in self.blueprint.robot_costs[robot_type].resources.items():
+            new_resources[self.resource_types.index(rtype)] -= amount
         return tuple(new_resources)
 
     def _initial_state(self) -> tuple:
@@ -45,6 +43,7 @@ class OptimizedRobotFactory:
         )
 
     def _get_build_options(self, resources, robots) -> list:
+        """ Return a list of robot types that can be built """
         options = []
         for i, rtype in enumerate(self.resource_types):
             if rtype != self.final_resource and robots[i] >= self.max_spend[rtype]:
@@ -66,10 +65,12 @@ class OptimizedRobotFactory:
             if time == time_limit:
                 best_result = max(best_result, resources[self.final_index])
                 continue
-
+            # Pruning: estimate the best possible outcome from this state
             minutes_left = time_limit - time
             current = resources[self.final_index]
             current_robots = robots[self.final_index]
+
+            # Max possible using current robots and potential future ones
             potential = current + current_robots * minutes_left + (minutes_left * (minutes_left - 1)) // 2
             if potential <= best_result:
                 continue
@@ -95,31 +96,28 @@ class OptimizedRobotFactory:
 
 # === Solvers ===
 class ResultCalculator(ABC):
-    """Interface pour calculer le résultat final (Single Responsibility)"""
-    
+    """Interface to calculate the final resource result (Single Responsibility)"""
     @abstractmethod
-    def calculate(self, geodes: List[int], blueprint_ids: List[int]) -> int:
+    def calculate(self, final_resource: List[int], blueprint_ids: List[int]) -> int:
         pass
 
 class QualityCalculator(ResultCalculator):
-    """Calcule la qualité totale (somme des géodes * ID)"""
-    
-    def calculate(self, geodes: List[int], blueprint_ids: List[int]) -> int:
-        return sum(geode_count * blueprint_id 
-                  for geode_count, blueprint_id in zip(geodes, blueprint_ids))
+    """Calculates the total quality (sum of final resource * ID)"""
+    def calculate(self, final_resource: List[int], blueprint_ids: List[int]) -> int:
+        return sum(final_resource_count * blueprint_id 
+                  for final_resource_count, blueprint_id in zip(final_resource, blueprint_ids))
 
 class ProductCalculator(ResultCalculator):
-    """Calcule le produit des géodes"""
-    
-    def calculate(self, geodes: List[int], blueprint_ids: List[int]) -> int:
+    """Calculate the product of all final resource"""
+    def calculate(self, final_resource: List[int], _) -> int:
         result = 1
-        for geode_count in geodes:
-            result *= geode_count
+        for final_resource_count in final_resource:
+            result *= final_resource_count
         return result
     
 @dataclass
 class SolverConfig:
-    """Configuration pour le solveur de blueprints"""
+    """Configuration for the blueprint solver"""
     filename: str
     time_limit: int = 24
     calculator: Optional[ResultCalculator] = None
@@ -129,26 +127,22 @@ class SolverConfig:
 
 def solve_blueprints(config: SolverConfig) -> int:
     """
-    Résout les blueprints selon la stratégie de calcul fournie
-    
+    Resolve blueprints according to the provided calculation strategy
     Args:
-        filename: Fichier contenant les blueprints
-        time_limit: Limite de temps en minutes
-        calculator: Stratégie de calcul du résultat (par défaut: QualityCalculator)
-        max_blueprints: Nombre maximum de blueprints à traiter (None = tous)
-        output_file: Fichier de sortie pour l'analyse
-    
+        filename: File containing the blueprints
+        time_limit: Time limit in minutes
+        calculator: Calculation strategy for the result (default: QualityCalculator)
+        max_blueprints: Maximum number of blueprints to process (None = all)
+        output_file: Output file for the analysis
     Returns:
-        Résultat calculé selon la stratégie choisie
+        tuple of final resource results and blueprint IDs
     """
-    # Dependency Inversion: dépend de l'abstraction ResultCalculator
     if config.calculator is None:
         config.calculator = QualityCalculator()
     
     loader = BlueprintLoader(DefaultBlueprintParser())
     blueprints = loader.load(config.filename)
     
-    # Open/Closed: facile d'ajouter de nouvelles limites sans modifier le code
     if config.max_blueprints is not None:
         blueprints = blueprints[:config.max_blueprints]
 
@@ -157,7 +151,7 @@ def solve_blueprints(config: SolverConfig) -> int:
     blueprint_qualities = []
     
     for i, blueprint in enumerate(blueprints, 1):
-        print(f"Traitement du Blueprint {i}...")
+        print(f"Handle Blueprint {i}...")
         
         factory = OptimizedRobotFactory(blueprint, final_resource=config.final_resource)
         max_geodes = factory.max_final_resource(config.time_limit)
@@ -165,32 +159,36 @@ def solve_blueprints(config: SolverConfig) -> int:
         final_resource_results.append(max_geodes)
         blueprint_ids.append(i)
         
-        # Calcul de la qualité pour chaque blueprint (géodes * ID)
         quality = max_geodes * i
         blueprint_qualities.append(quality)
         
         print(f"Blueprint {i}: {max_geodes} {config.final_resource}s")
     
-    # Écriture du fichier d'analyse
-    _write_analysis_file(config.output_file, blueprint_ids, blueprint_qualities)
+    return (final_resource_results, blueprint_ids)
     
-    # Liskov Substitution: n'importe quelle implémentation de ResultCalculator fonctionne
-    result = config.calculator.calculate(final_resource_results, blueprint_ids)
-    return result
 
-
-def _write_analysis_file(output_file: str, blueprint_ids: List[int], qualities: List[int]) -> None:
-    """Écrit le fichier d'analyse avec les qualités des blueprints"""
+def _write_analysis_file(output_file: str, blueprint_ids: List[int], final_resource_results: List[int]) -> None:
+    """Writes the analysis file with the qualities of the blueprints"""
     with open(output_file, 'w', encoding='utf-8') as f:
-        # Écriture des qualités de chaque blueprint
+        qualities = []
+        for ressource, id in zip(final_resource_results, blueprint_ids):
+            qualities.append(ressource * id)
+
         for blueprint_id, quality in zip(blueprint_ids, qualities):
             f.write(f"Blueprint {blueprint_id}: {quality}\n")
         
-        # Trouve le meilleur blueprint
         if qualities:
             best_index = qualities.index(max(qualities))
             best_blueprint_id = blueprint_ids[best_index]
             f.write(f"\nBest blueprint is the blueprint {best_blueprint_id}.\n")
+
+
+def calculate_and_write_analysis(config: SolverConfig) -> int:
+    final_resource_results, blueprint_ids = solve_blueprints(config)
+    _write_analysis_file(config.output_file, blueprint_ids, final_resource_results)
+    
+    result = config.calculator.calculate(final_resource_results, blueprint_ids)
+    return result
 
 
 # === Main ===
@@ -204,7 +202,7 @@ if __name__ == "__main__":
         time_limit=24,
         calculator=QualityCalculator()
     )
-    print(f"Score total: {solve_blueprints(config1)}")
+    print(f"Produit total: {calculate_and_write_analysis(config1)}")
     
     print("\n=== Partie 2 : Produit des Géodes sur les 3 premiers en 32 min ===")
     config2 = SolverConfig(
@@ -213,7 +211,7 @@ if __name__ == "__main__":
         calculator=ProductCalculator(),
         max_blueprints=3
     )
-    print(f"Produit total: {solve_blueprints(config2)}")
+    print(f"Produit total: {calculate_and_write_analysis(config2)}")
     
     print("\n=== Partie 3 : Produit des Diamants sur les 2 blueprints en 24 min ===")
     config3 = SolverConfig(
@@ -222,4 +220,4 @@ if __name__ == "__main__":
         calculator=ProductCalculator(),
         final_resource='diamond'
     )
-    print(f"Produit total: {solve_blueprints(config3)}")
+    print(f"Produit total: {calculate_and_write_analysis(config3)}")
