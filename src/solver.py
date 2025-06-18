@@ -22,6 +22,8 @@ class QualityCalculator(ResultCalculator):
 class ProductCalculator(ResultCalculator):
     """Calculate the product of all final resource"""
     def calculate(self, final_resource: List[int], _) -> int:
+        if not final_resource:
+            return 0
         result = 1
         for final_resource_count in final_resource:
             result *= final_resource_count

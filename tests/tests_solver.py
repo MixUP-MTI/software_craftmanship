@@ -60,7 +60,7 @@ class TestResultCalculators(unittest.TestCase):
     def test_product_calculator_empty_list(self):
         """Test ProductCalculator with empty list"""
         result = self.product_calculator.calculate([], [1, 2, 3])
-        self.assertEqual(result, 1)
+        self.assertEqual(result, 0)
         
     def test_product_calculator_single_element(self):
         """Test ProductCalculator with single element"""
