@@ -9,10 +9,10 @@ class OptimizedRobotFactory:
         self.resource_types = list(blueprint.robot_costs.keys())
         self.final_resource = final_resource or self.resource_types[-1]
         self.final_index = self.resource_types.index(self.final_resource)
-        self.max_spend = self._calculate_max_spend()
+        self.max_spend = self._max_resource_needed_per_turn()
         self.State = namedtuple("State", "time resources robots")
 
-    def _calculate_max_spend(self):
+    def _max_resource_needed_per_turn(self):
         max_spend = {rtype: 0 for rtype in self.resource_types}
         max_spend[self.final_resource] = float('inf')
         for robot_cost in self.blueprint.robot_costs.values():
@@ -71,10 +71,10 @@ class OptimizedRobotFactory:
             if potential <= best_result:
                 continue
 
-            key = (time, resources, robots)
-            if key in seen:
+            visited_states = (time, resources, robots)
+            if visited_states in seen:
                 continue
-            seen.add(key)
+            seen.add(visited_states)
 
             for choice in self._get_build_options(resources, robots):
                 new_resources = list(resources)
