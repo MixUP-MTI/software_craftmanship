@@ -12,7 +12,7 @@ app = FastAPI()
 
 @app.get("/blueprints/analyze")
 def analyze_blueprints():
-    filename = "diamond.txt"
+    filename = os.path.join(os.path.dirname(__file__), '..', 'data', 'diamond.txt')
     try:
         loader = BlueprintLoader(DefaultBlueprintParser())
         blueprints = loader.load(filename)
